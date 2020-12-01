@@ -1,0 +1,21 @@
+[package]
+name = "lfu_vecs"
+version = "0.1.0"
+authors = ["mdomans <mdomans@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bytes="*"
+rand = "0.4.2"
+
+[dev-dependencies]
+quickcheck="*"
+criterion="*"
+
+[[bench]]
+name="naive"
+harness=false
