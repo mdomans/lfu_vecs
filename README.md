@@ -22,3 +22,25 @@ Assuming Rust's `HashMap` `get`, `insert` and `remove` operations are O(1) this 
   * `get` means we need to grab the `Item` from `HashMap`, pull key from `Vec<FrequencyNode>`, assign it to next `Vec<FrequencyNode>` and incrment it's `index`
   * `set` is simply insert into `HashMap` and add key to `Vec<FrequencyNode>` at index 0
   * only worrying point at the moment is adding new `FrequencyNode>` since that's O(m) where m is `Vec.len()`
+
+### So is this any good?
+
+Well, it's written using `Vec`, `HashMap` and tokio `Bytes`. Thus it's limited to being oportunistically (expected/amortized) O(1) rather than guaranteed O(1). 
+
+Complexities for `Vec` and `HashMap` are sourced from [here](https://doc.rust-lang.org/std/collections/index.html)
+
+At minimum cache has to provide two key functions:
+- **get** - internally this means one `HashMap.get`, `Vec.get_mut` and `Vec.push` operations 
+- **insert** - internally this means `HashMap.get` and `Vec.get_mut` and `Vec.push` operations
+
+with `Vec.get` being O(1) and `HashMap.get` being expected O(1) the only problem is `Vec.push` which is amortized O(1) in this case. 
+
+### Interesting reading
+
+To read if `HashMap` makes sense you can read on it [here](https://www.reddit.com/r/rust/comments/52grcl/rusts_stdcollections_is_absolutely_horrible/)
+
+
+
+
+
+
