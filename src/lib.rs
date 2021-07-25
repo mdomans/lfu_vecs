@@ -8,18 +8,16 @@
 //!
 
 use bytes::Bytes;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug, Default)]
 struct FrequencyNode {
-    items: Vec<String>
+    items: Vec<String>,
 }
 
 impl FrequencyNode {
     pub fn new() -> Self {
-        FrequencyNode {
-            items: vec![]
-        }
+        FrequencyNode { items: vec![] }
     }
 }
 
@@ -27,12 +25,12 @@ impl FrequencyNode {
 #[derive(Debug, Default)]
 struct Item {
     data: Bytes,
-    parent: usize
+    parent: usize,
 }
 
 impl Item {
     pub fn new(data: Bytes) -> Self {
-        Item {data, parent: 0}
+        Item { data, parent: 0 }
     }
 }
 
@@ -52,6 +50,8 @@ pub struct LFU {
     max_size: usize,
     // this keeps track of size of heap stored Items data
     current_size: usize,
+    // useful extension of vect based LFU with history option
+    history: VecDeque<String>,
 }
 
 impl LFU {
@@ -62,7 +62,8 @@ impl LFU {
             max_size: 64,
             current_size: 0,
             tail_index: 0,
-            frequency_list: vec![frequency_head]
+            frequency_list: vec![frequency_head],
+            history: VecDeque::with_capacity(64),
         }
     }
     ///
@@ -78,6 +79,22 @@ impl LFU {
         self
     }
     ///
+    /// Check if we have value for this key
+    ///
+    /// ```
+    /// use lfu_vecs::LFU;
+    /// use bytes::Bytes;
+    /// let mut lfu = LFU::new().max_size(1024);
+    /// assert_eq!(lfu.contains_key("a"), false);
+    /// lfu.insert("a".to_string(), Bytes::from("a"));
+    /// assert_eq!(lfu.contains_key("a"), true);
+    /// ```
+    ///
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.items.contains_key(key)
+    }
+
+    ///
     /// Check how many items there currently is in cache
     ///
     /// ```
@@ -92,7 +109,6 @@ impl LFU {
     pub fn current_size(&self) -> usize {
         self.current_size
     }
-
     ///
     /// Allows to check frequency for a key of given value
     ///
@@ -113,7 +129,7 @@ impl LFU {
     pub fn get_frequency(&mut self, key: &str) -> usize {
         match self.items.get(key) {
             Some(item) => item.parent,
-            _ => 0
+            _ => 0,
         }
     }
 
@@ -131,15 +147,15 @@ impl LFU {
     /// ```
     pub fn get(&mut self, key: &str) -> Option<&Bytes> {
         if let Some(item) = self.items.get_mut(key) {
-            if let Some(frequency_node) = self.frequency_list.get_mut(item.parent){
-                frequency_node.items.retain(|x|x!=key);
+            if let Some(frequency_node) = self.frequency_list.get_mut(item.parent) {
+                frequency_node.items.retain(|x| x != key);
             }
             item.parent += 1;
-            match self.frequency_list.get_mut(item.parent){
+            match self.frequency_list.get_mut(item.parent) {
                 Some(frequency_node) => {
                     // we have the next fnode
                     frequency_node.items.push(key.to_owned());
-                },
+                }
                 None => {
                     // we need to add a node
                     let mut frequency_node = FrequencyNode::new();
@@ -152,6 +168,35 @@ impl LFU {
             None
         }
     }
+    ///
+    /// Record evicted key in history
+    ///
+    fn add_to_history(&mut self, dropped_key: String) {
+        while self.history.len() > self.max_size {
+            self.history.pop_back();
+        }
+        self.history.push_front(dropped_key);
+    }
+    ///
+    /// Check if key was recently dropped from cache. History has same size as max_size (remembers max_size keys)
+    ///
+    ///
+    /// ```
+    /// use lfu_vecs::LFU;
+    /// use bytes::Bytes;
+    /// let mut lfu = LFU::new().max_size(3);
+    /// lfu.insert("a".to_string(), Bytes::from("42"));
+    /// lfu.insert("b".to_string(), Bytes::from("43"));
+    /// lfu.insert("c".to_string(), Bytes::from("43"));
+    /// assert_eq!(lfu.has_evicted_recently("a"), true);
+    /// ```
+
+    pub fn has_evicted_recently(self, key: &str) -> bool {
+        self.history
+            .iter()
+            .any(|historical_key| historical_key.eq(key))
+    }
+
     ///
     /// Insert a value into LFU
     ///
@@ -166,11 +211,12 @@ impl LFU {
     /// ```
     pub fn insert(&mut self, key: String, value: Bytes) -> Option<Bytes> {
         let mut fnode_index = 0 as usize;
-        while self.current_size + value.len() >= self.max_size  {
+        while self.current_size + value.len() >= self.max_size {
             if let Some(frequency_node) = self.frequency_list.get_mut(fnode_index) {
                 if let Some(key) = frequency_node.items.pop() {
                     if let Some(item) = self.items.remove(&key) {
                         self.current_size -= item.data.len();
+                        self.add_to_history(key);
                     }
                 };
             }
@@ -181,17 +227,13 @@ impl LFU {
         }
 
         self.current_size += value.len();
-        let previous = match self.items.insert(key.clone(), Item::new(value)){
-            Some(previous) => {
-                Some(previous.data)
-            },
-            None => None
+        let previous = match self.items.insert(key.clone(), Item::new(value)) {
+            Some(previous) => Some(previous.data),
+            None => None,
         };
         match self.frequency_list.get_mut(0) {
-            Some(frequency_node) => {
-                frequency_node.items.push(key)
-            },
-            _ => unreachable!()
+            Some(frequency_node) => frequency_node.items.push(key),
+            _ => unreachable!(),
         }
         previous
     }
