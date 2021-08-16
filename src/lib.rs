@@ -191,7 +191,7 @@ impl LFU {
     /// assert_eq!(lfu.has_evicted_recently("a"), true);
     /// ```
 
-    pub fn has_evicted_recently(self, key: &str) -> bool {
+    pub fn has_evicted_recently(&self, key: &str) -> bool {
         self.history
             .iter()
             .any(|historical_key| historical_key.eq(key))
