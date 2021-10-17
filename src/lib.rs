@@ -210,7 +210,7 @@ impl LFU {
     /// assert_eq!(lfu.get("a"), Some(&Bytes::from("z")));
     /// ```
     pub fn insert(&mut self, key: String, value: Bytes) -> Option<Bytes> {
-        let mut fnode_index = 0 as usize;
+        let mut fnode_index = 0_usize;
         while self.current_size + value.len() >= self.max_size {
             if let Some(frequency_node) = self.frequency_list.get_mut(fnode_index) {
                 if let Some(key) = frequency_node.items.pop() {

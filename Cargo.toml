@@ -11,11 +11,15 @@ edition = "2018"
 [dependencies]
 bytes="1"
 rand = "0.4.2"
+lfu = {path="../lfu"}
 
 [dev-dependencies]
 quickcheck="*"
 criterion="*"
 
 [[bench]]
-name="naive"
+name="basic"
 harness=false
+
+[profile.bench]
+debug = true
